@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"example.com/mod/handler"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,15 +20,6 @@ const (
 	password = "abc123"
 )
 
-type Todo struct {
-	Task    string `json:"task"`
-	Checked bool   `json:"checked"`
-}
-
-var (
-	toDoList = &Todo{Task: "Learn Go", Checked: true}
-)
-
 var db *gorm.DB
 var err error
 
@@ -45,40 +36,22 @@ func main() {
 	}
 
 	//close connection when main function finishes
-	defer db.Close()
+	//what is proper way to handle error here
+	defer func(db *gorm.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(db)
 
 	//make migrations to the database if not been created
-	db.AutoMigrate(&Todo{})
+	db.AutoMigrate(&handler.Todo{})
 
 	//API ROUTES
 	router := mux.NewRouter()
-	router.HandleFunc("/tasktodo", getTasks).Methods("GET")
-	router.HandleFunc("/createtask", createTasks).Methods("POST")
+	router.HandleFunc("/tasktodo", handler.GetTasks).Methods("GET")
+	router.HandleFunc("/createtask", handler.CreateTasks).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 
-}
-
-func getTasks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var listtodo []Todo
-	db.Find(&listtodo)
-	json.NewEncoder(w).Encode(&listtodo)
-}
-
-func createTasks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var listtodo Todo
-	err := json.NewDecoder(r.Body).Decode(&listtodo)
-	if err != nil {
-		return
-	}
-
-	createdTasks := db.Create(&listtodo)
-	err = createdTasks.Error
-	if err != nil {
-		json.NewEncoder(w).Encode(err)
-	} else {
-		json.NewEncoder(w).Encode(&listtodo)
-	}
 }
